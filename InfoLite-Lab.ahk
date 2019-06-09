@@ -4,6 +4,11 @@ global DEBUG_VIEWER:= false
 global window := new InfoLiteLab()
 global window_shown := true
 Gui, InfoLiteLab1:+AlwaysOnTop
+Gui, InfoLiteLab1:-dpiscale
+
+;RegisterObjActive(window  ,"{CCCCCCCC-CCCC-CCCC-CCCC-ACCCCCCCCCC1}")
+;RegisterObjActive(InfoLite,"{CCCCCCCC-CCCC-CCCC-CCCC-ACCCCCCCCCC2}")
+
 
 ;Hide when ICM not active, show when active.
 SetTimer, OnTimer
@@ -42,42 +47,17 @@ return
 
 
 
-;Tree generated from object as follows:
-;[
-;  {
-;    type:"Folder",
-;    name:"System",
-;    icon:"%A_ScriptDir%\scripts\_.png",
-;    children:[
-;      {
-;        type:"Script",
-;        name:"FileName",
-;        path:"%A_ScriptDir%\scripts\FileName.rb",
-;        icon:"%A_ScriptDir%\scripts\FileName.rb.png"
-;      },
-;      ...
-;    ]
-;  },{
-;    type:"Folder",
-;    name:"User",
-;    icon:"%A_AppData%\InfoLite-Lab\scripts\_.png",
-;    children:[
-;      ...
-;    ]
-;  },{
-;    type:"Folder",
-;    name:"User",
-;    icon:"%A_Documents%\InfoLite-Lab\scripts\_.png",
-;    children:[
-;      ...
-;    ]
-;  }
-class InfoLiteLab extends CGUI {  
+class InfoLiteLab extends CGUI {
+  ;Set default registered classes
+  static registeredClasses := [ILL_Script,ILL_Folder]
+    
   ;Controls can be defined as class variables at the top of the class like this:
   Refresh := this.AddControl("Button", "Refresh", "x210 y15 w30 h30", "R")  ;⟳
   Query := this.AddControl("Edit", "Query", "x15 y15 w200 h30 -Multi", "")
   ;Option -Multi: ensures no multiline up-downs
   
+  
+  ;Tree generated from hierarchy of IIL_File and IIL_Folder objects.
   class InfoLiteTree {
     static Type    := "TreeView"
     static Options := "x15 y60 w300"
@@ -144,6 +124,7 @@ class InfoLiteLab extends CGUI {
     this.InfoLiteTree.DoubleClick.Handler := new Delegate(this,"OnExecuteRuby")
     this.InfoLiteTree.RightClick.Handler  := new Delegate(this,"OnOpenContext")
     
+    ;Set default roots:
     this.roots := [ A_ScriptDir , A_Roaming "\InfoLite-Lab" , A_Documents "\InfoLite-Lab"]
     
     ;Get file tree
@@ -166,7 +147,7 @@ class InfoLiteLab extends CGUI {
       sScriptDir := sRoot . "\scripts"
       if fileexist(sScriptDir){
         scriptDir := fso.GetFolder(sScriptDir)
-        item := (new ILL_Folder(scriptDir))
+        item := this.handleChild(scriptDir)
         if (sRoot == A_ScriptDir) {
           item.name := "AppRoot"
         } else if (sRoot == A_Roaming "\InfoLite-Lab") {
@@ -182,8 +163,8 @@ class InfoLiteLab extends CGUI {
   
   Size(event){
     ;Get GUI dimensions and constants
-    GUIW := this.width / 1.5
-    GUIH := this.height / 1.5
+    GUIW := this.width  ;/ 1.5
+    GUIH := this.height ;/ 1.5
     BND  := 15
     
     ;Calculate Refresh button size/position
@@ -260,6 +241,16 @@ class InfoLiteLab extends CGUI {
     this.SetTree(filter)
   }
   
+  ;;;;SORT OUT WASHING
+  handleChild(shObject){
+    for i,klass in InfoLiteLab.registeredClasses {
+      if klass.identify(shObject) {
+        return klass.create(shObject)
+      }
+    }
+    return false
+  }
+  
   ;Convert array of File/Folder objects to a FLAT array of File/Folder objects
   ;This function also builds a 'simple path' for the objects based on the TreeView item names and hierarchy.
   GetFileArray(obj,BasePath:="",files := false){
@@ -267,9 +258,10 @@ class InfoLiteLab extends CGUI {
       files := []
     }
     for i,child in obj {
-      if child.type = "Folder" {
+      if child.children {
         this.GetFileArray(child.children,BasePath . child.name . "/", files)
-      } else if child.type = "Script" {
+      }
+      if child.isFilterable {
         child.simplePath := BasePath . child.name
         files.push(child)
       }
@@ -307,8 +299,12 @@ class InfoLiteLab extends CGUI {
   ;Execute selected ruby item. This is executed on double click and enter press. 
   OnExecuteRuby(Tree){
     script := Tree.RubyItemDict[Tree.SelectedItem.id]
-    if (script.type != "Folder") {
+    if (!script.children) {
       script.execute()
+    } else {
+      MsgBox, 36, InfoLite-Lab, Do you want to execute all scripts within this folder?
+      IfMsgbox Yes
+        script.execute()
     }
   }
   
@@ -323,28 +319,44 @@ class InfoLiteLab extends CGUI {
   OnRefresh(event:=false){
     this.SetTree(this.getFileTrees())
   }
-}
-
-;folder := ComObjCreate("Scripting.FileSystemObject").GetFolder(A_ScriptDir "\scripts")
-;structure := new ILL_Folder(folder)
-;msgbox Please debug
-
-;Create menu from keys and values
-helperMenu(data){
-  ; Arguments assigned to menu functions: MenuItemClicked,ClickType,MenuName
-  ; Binding this to the function ensures this object is preserved.
-  try Menu, Context, DeleteAll
-  for key,value in data {
-    Menu, Context, Add, %key%, %value%
+  
+  
+  
+  ;Create menu from keys and values
+  _helperMenu(data,show:=false){
+    ; Arguments assigned to menu functions: MenuItemClicked,ClickType,MenuName
+    ; Binding this to the function ensures this object is preserved.
+    try Menu, Context, DeleteAll
+    for key,value in data {
+      Menu, Context, Add, %key%, %value%
+    }
+    if show
+      Menu, Context, Show
   }
+  
+  
 }
 
 class ILL_Script {
   static iconExts := ["GIF", "JPG", "BMP", "ICO", "CUR", "ANI", "PNG", "TIF", "Exif", "WMF", "EMF"]
-  __New(shFile){
-    this.type := "Script"
-    this.name := shFile.name
-    this.path := shFile.path
+  ;Accept only ruby files
+  identify(shObj){
+    return shObj.path ~= "i).+\.rb$"
+  }
+  
+  ;Static method for creating class (allows external libraries with language limitations)
+  create(shObj){
+    return new this(shObj)
+  }
+  
+  __New(shObj){
+    this.type := "Executable"
+    this.name := shObj.name
+    this.path := shObj.path
+    
+    
+    this.isFilterable := true
+    
     for i,ext in ILL_Script.iconExts {
       img := this.path "." ext
       if fileexist(img) {
@@ -355,6 +367,8 @@ class ILL_Script {
       }
     }
   }
+  
+  ;Execute file
   execute(){
     if DEBUG_VIEWER {
       msgbox, % this.path
@@ -365,11 +379,15 @@ class ILL_Script {
         msgbox, % errors.message
     }
   }
+  
+  ;Called on right click
   openContext(){
-    helperMenu({ "Execute script": this.execute.bind(this)
-                ,"Open in explorer": this.openInExplorer.bind(this)})
+    InfoLiteLab._helperMenu({ "Execute script": this.execute.bind(this)
+                             ,"Open in explorer": this.openInExplorer.bind(this)})
     Menu, Context, Show
   }
+  
+  ;Context item implementation
   openInExplorer(){
     path := this.path
     Run %COMSPEC% /c explorer.exe /select`, "%path%",, Hide
@@ -377,10 +395,30 @@ class ILL_Script {
 }
 class ILL_Folder {
   static iconExts := ["GIF", "JPG", "BMP", "ICO", "CUR", "ANI", "PNG", "TIF", "Exif", "WMF", "EMF"]
+  
+  ;Accept all directories
+  identify(shObj){
+    return (ComObjType(shObj, "Name") == "IFolder")
+  }
+  
+  create(shObj){
+    return new this(shObj)
+  }
+  
   __New(shFolder){
+    ;Using type is best avoided but is beneficial to other programs viewing the COM model.
     this.type := "Folder"
+    
+    ;Name of folder in tree
     this.name := shFolder.name
+    
+    ;Path of folder on disk
     this.path := shFolder.path
+    
+    ;Disallow folders to be found by filtering - disallowed because it may look odd
+    this.isFilterable := false
+    
+    ;Attempt to find icon for file.
     for i,ext in ILL_Folder.iconExts {
       img := this.path . "\_." ext
       if fileexist(img){
@@ -390,16 +428,20 @@ class ILL_Folder {
         this.icon := false
       }
     }
+    
+    ;Get children
     this.children := []
-   
     ;Get folders
     for child in shFolder.SubFolders {
-      this.children.push(new ILL_Folder(child))
+      if res := InfoLiteLab.handleChild(child) {
+        this.children.push(res)
+      }
     }
-   
+    
+    ;Get files
     for child in shFolder.files {
-      if (child.name ~= "i).+\.rb$") {
-        this.children.push(new ILL_Script(child))
+      if res := InfoLiteLab.handleChild(child) {
+        this.children.push(res)
       }
     }
   }
@@ -411,8 +453,8 @@ class ILL_Folder {
   }
   
   openContext(){
-    helperMenu({ "Execute all": this.execute.bind(this) 
-                ,"Open in explorer": this.openInExplorer.bind(this)})
+    InfoLiteLab._helperMenu({ "Execute all": this.execute.bind(this) 
+                             ,"Open in explorer": this.openInExplorer.bind(this)})
     Menu, Context, Show
   }
   openInExplorer(){
