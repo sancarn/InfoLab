@@ -1,4 +1,4 @@
-﻿#Include ILInjectRuby.ahk
+﻿#Include InfoLite-API.ahk
 #SingleInstance,Force
 global DEBUG_VIEWER:= false
 global window := new InfoLiteLab()
@@ -374,7 +374,7 @@ class ILL_Script {
       msgbox, % this.path
     } else {
       ;Execute ruby script and report on any errors which occurred
-      errors := RubyFileExec(ICMGetPID(),pth)
+      errors := InfoLite.executeRuby(pth)
       if errors
         msgbox, % errors.message
     }
@@ -467,11 +467,16 @@ class ILL_Folder {
   reload
 return
 
+isWindowActive(){
+  global window
+  return WinExist("A") = window.hwnd
+}
 
-#ifwinactive InfoLite-Lab
-RButton::
-  Send,{LButton}
-  Send,{RButton}
+
+#if isWindowActive()
+RButton up::
+  SendInput,{LButton}
+  SendInput,{RButton}
 return
 
 

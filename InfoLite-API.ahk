@@ -1,5 +1,5 @@
-#Persistent
-#SingleInstance,Force
+;#Persistent
+;#SingleInstance,Force
 
 
 class InfoLite {
