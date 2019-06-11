@@ -36,6 +36,10 @@ return
 
 
 ;TODO:
+;  Bugs:
+;    * After refresh this.InfoLiteTree.SelectedItem becomes permanently unknown? Not sure why this is occurring...
+;      Probably has something to do with CTreeViewControl. Temporary fix is force reloading the app with Reload.
+;      #REFRESH to find related code
 ;  Settings!
 ;    * Can be stored in any root
 ;    * Stores the location of other roots   
@@ -121,7 +125,7 @@ class InfoLiteLab extends CGUI {
     this.OnMessage(0x0101,"OnGUIKeyUp")
     
     ;TreeView Events
-    this.InfoLiteTree.DoubleClick.Handler := new Delegate(this,"OnExecuteRuby")
+    this.InfoLiteTree.DoubleClick.Handler := new Delegate(this,"OnExecuteItem")
     this.InfoLiteTree.RightClick.Handler  := new Delegate(this,"OnOpenContext")
     
     ;Set default roots:
@@ -291,15 +295,24 @@ class InfoLiteLab extends CGUI {
       
       ;If TreeView is focussed then execute selected item
       if (this.InfoLiteTree.Focused){
-        this.OnExecuteRuby(this.InfoLiteTree)
+        this.OnExecuteItem(this.InfoLiteTree)
       }
     }
   }
   
   ;Execute selected ruby item. This is executed on double click and enter press. 
-  OnExecuteRuby(Tree){
-    script := Tree.RubyItemDict[Tree.SelectedItem.id]
+  OnExecuteItem(Tree:=false){ ;FYI Tree is not consistent here...
+    selected := this.InfoLiteTree.SelectedItem
+    
+    ;#REFRESH ToDo: Fix.
+    if !selected.id {
+      msgbox A known error has occurred. While we try to fix this error as a temporary fix we will reload the app.`r`nPlease try again once the app has reloaded.
+      Reload
+    }
+    
+    script := this.InfoLiteTree.RubyItemDict[selected.id]
     if (!script.children) {
+      InfoLite.__DebugTip(A_ThisFunc,"BEFORE_ExecuteItem()",true)
       script.execute()
     } else {
       MsgBox, 36, InfoLite-Lab, Do you want to execute all scripts within this folder?
@@ -310,13 +323,22 @@ class InfoLiteLab extends CGUI {
   
   ;This is called whenever the user right clicks on an item.
   ;The item is obtained via the RubyItemDict and then openContext() is called
-  OnOpenContext(Tree){
-    item := Tree.RubyItemDict[Tree.SelectedItem.id]
+  OnOpenContext(Tree:=false){ ;FYI Tree is not consistent here...
+    selected := this.InfoLiteTree.SelectedItem
+    
+    ;#REFRESH ToDo: Fix.
+    if !selected.id {
+      msgbox A known error has occurred. While we try to fix this error as a temporary fix we will reload the app.`r`nPlease try again once the app has reloaded.
+      Reload
+    }
+    item := this.InfoLiteTree.RubyItemDict[selected.id]
     item.openContext()
   }
   
   ;
   OnRefresh(event:=false){
+    ;#REFRESH Temporary fix for refresh error.
+    Reload
     this.SetTree(this.getFileTrees())
   }
   
@@ -370,11 +392,14 @@ class ILL_Script {
   
   ;Execute file
   execute(){
+    InfoLite.__DebugTip(A_ThisFunc,"IN_Execute()",true)
+    global DEBUG_VIEWER
     if DEBUG_VIEWER {
       msgbox, % this.path
     } else {
       ;Execute ruby script and report on any errors which occurred
-      errors := InfoLite.executeRuby(pth)
+      InfoLite.__DebugTip(A_ThisFunc,"BEFORE_ExecuteRuby()",true)
+      errors := InfoLite.executeRuby(this.path)
       if errors
         msgbox, % errors.message
     }
