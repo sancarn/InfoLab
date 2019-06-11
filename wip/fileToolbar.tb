@@ -1,0 +1,34 @@
+;Toolbar format?
+
+[Toolbar]
+;Toolbar data
+toolbar=File
+icontb=some.file.png
+
+[Buttons]
+;Button count
+buttons=10
+
+;Button names for instantiation
+button01=Open/create master database
+button02=New transportable database
+button03=Open another master database
+button04=Open transportable database
+button05=Print
+button06=Save to master database
+button07=Update from master database
+button08=Revert changes
+button09=User Flags
+button10=About
+
+;Icons:
+icon01=some/file.png
+icon02=some/file.png
+icon03=some/file.png
+icon04=some/file.png
+icon05=some/file.png
+icon06=some/file.png
+icon07=some/file.png
+icon08=some/file.png
+icon09=some/file.png
+icon10=some/file.png
