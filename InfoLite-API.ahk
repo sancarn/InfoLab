@@ -13,7 +13,7 @@ class InfoLite {
   static rubyExtScript := InfoLite._getRubyExtScript()
   static Messages := {"WM_COMMAND":     0x0111
                      ,"WM_MDIGETACTIVE":0x0229}
-  
+  static DEBUG_MODE := true
   
   
   getPID(){
@@ -65,9 +65,6 @@ class InfoLite {
       return Exception("#2 Ruby file does not exist.","checkRubyCanRun","")
     }
     
-    ;Set unhook on exit
-    OnExit("Unhook_pRunWaitRuby")
-    
     ;Set ruby script to run
     this._RUBY_SCRIPT := rbFile
     
@@ -77,10 +74,9 @@ class InfoLite {
       return Exception("#1 Ruby can't run at the moment. Please select a GeoPlan and try again.","checkRubyCanRun","")
     }
     
-    
     ;Hook window events
     this.__DebugTip(A_ThisFunc,"BEFORE_HookWinEvents",true)
-    WinEvents.HookEvent(this.pRunWaitRuby, this.EVENTS_REQUIRED, pid)
+    this.WinEvents.HookEvent(this,this.pRunWaitRuby, this.EVENTS_REQUIRED, pid)
     
     ;Ensure we always get the event:
     sleep,50 
@@ -100,7 +96,7 @@ class InfoLite {
     
     ;Unhook window events
     this.__DebugTip(A_ThisFunc,"BEFORE_UnhookWinEvents",true)
-    WinEvents.UnHookEvent(this.pRunWaitRuby, this.EVENTS_REQUIRED)
+    this.WinEvents.UnHookEvent(this.pRunWaitRuby, this.EVENTS_REQUIRED)
     
     ;Ensure ICM is ready
     sleep,300
@@ -117,7 +113,8 @@ class InfoLite {
       if item.Name = "InnovyzeWC.exe" {
         if item.ProcessId = pid {
           name := instr(item.CommandLine,"/asset") ? "IN" : "ICM"
-          RegexMatch(this._FGP_Value(Item.ExecutablePath,"File version"),"(\d+\.\d+).+",match)
+          version := this._FGP_Value(Item.ExecutablePath,"File version")
+          RegexMatch(version,"(\d+\.\d+).+",match)
           num := match1
           
           return name . "-" .  num
@@ -128,8 +125,7 @@ class InfoLite {
   
   LaunchRubyScriptDlg(pid){
     ilVersion := this.getILVersion(pid)
-    wParam := this.VersionWParams[ilVersion]
-    
+    wParam := InfoLite.VersionWParams[ilVersion]
     hwnd := this.getILMainWindow(pid)
     PostMessage, % this.Messages.WM_COMMAND,%wParam%,0,,ahk_id %hwnd%
   }
@@ -165,6 +161,16 @@ class InfoLite {
   }
 
   pRunWaitRuby(hHook, event, hwnd, idObject, idChild, dwEventThread, dwmsEventTime){
+    ;Arg shifting required due to object 
+    dwmsEventTime := dwEventThread
+    dwEventThread := idChild
+    idChild       := idObject
+    idObject      := hwnd
+    hwnd          := event
+    event         := hHook
+    hHook         := this
+    this          := object(A_EventInfo) ;Get saved object reference
+    
     WinGetTitle Title, ahk_id %hwnd%
     WinGetClass cls, ahk_id %hwnd%
     
@@ -200,7 +206,7 @@ class InfoLite {
 
   ;Unhook event on delete
   __Delete(){
-    WinEvents.UnHookEvent(this.pRunWaitRuby, this.EVENTS_REQUIRED)
+    this.WinEvents.UnHookEvent(this.pRunWaitRuby, this.EVENTS_REQUIRED)
   }
   
 
@@ -318,7 +324,7 @@ class InfoLite {
   ;	               0	 - The property is blank.
   ;	               -1 - The property name or number is not valid.
   _FGP_Value(FilePath, Property) {
-    static PropTable := this._FGP_Init()
+    static PropTable := InfoLite._FGP_Init()
     if ((PropNum := PropTable.Name[Property] != "" ? PropTable.Name[Property]
     : PropTable.Num[Property] ? Property : "") != "") {
       SplitPath, FilePath, FileName, DirPath
@@ -410,14 +416,13 @@ class InfoLite {
       return events
     }
 
-    HookEvent(function, events, pid := "0", flags := "0") {
+    HookEvent(obj,function, events, pid := "0", flags := "0") {
         if(!this.EventHookTable)
           this.EventHookTable:={}
-        
         for i, event_id in events {
             if(!this.EventHookTable[event_id])
                 this.EventHookTable[event_id] := Array() 
-            if(this.CreateWinEventHook(function, event_id, pid, flags))
+            if(this.CreateWinEventHook(obj,function, event_id, pid, flags))
                 this.EventHookTable[event_id].Push(function)
         }
     }
@@ -437,12 +442,12 @@ class InfoLite {
         }
     }
 
-    CreateWinEventHook(function, event, pids := "0", dwflags := "0") {
+    CreateWinEventHook(obj,function, event, pids := "0", dwflags := "0") {
         this._hHookTable
         if(!this._hHookTable)
           this._hHookTable:={}
         
-        cb := RegisterCallback(function)
+        cb := RegisterCallback(function,,,&obj)
         this.DeleteWinEventHook(function, event)
         
         ;Try to co-initialise
