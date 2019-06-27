@@ -13,7 +13,7 @@ class InfoLite {
   static rubyExtScript := InfoLite._getRubyExtScript()
   static Messages := {"WM_COMMAND":     0x0111
                      ,"WM_MDIGETACTIVE":0x0229}
-  static DEBUG_MODE := true
+  static DEBUG_MODE := false
   
   
   getPID(){
