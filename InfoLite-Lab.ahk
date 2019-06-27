@@ -1,6 +1,5 @@
 ﻿#Include InfoLite-API.ahk
 #SingleInstance,Force
-global DEBUG_VIEWER:= false
 global window := new InfoLiteLab()
 global window_shown := true
 Gui, InfoLiteLab1:+AlwaysOnTop
@@ -17,15 +16,30 @@ return
 #Include Lib\CGUI.ahk
 OnTimer:
   WinGetClass, klass, A
-  if !DEBUG_VIEWER {
-    hwnd := WinExist("A")
-    if WinActive("ahk_exe InnovyzeWC.exe") || WinActive("ahk_id " window.hwnd) {
+  ;tooltip % window.DebugMode . "-" . window.DispState
+  if window.DebugMode=0 {
+    if window.DispState=0 {
+      hwnd := WinExist("A")
+      WinGet, A_PID, PID, % "ahk_id " window.hwnd
+      if WinActive("ahk_exe InnovyzeWC.exe") || WinActive("ahk_pid " A_PID) {
+        if !window_shown {
+          window.show()
+          window_shown := true
+          Winactivate, ahk_id %hwnd%
+        }
+      } else {
+        if window_shown {
+          window.hide()
+          window_shown := false
+        }
+      }
+    } else if(DispState=1){
       if !window_shown {
         window.show()
         window_shown := true
         Winactivate, ahk_id %hwnd%
       }
-    } else {
+    } else if(DispState=2){
       if window_shown {
         window.hide()
         window_shown := false
@@ -36,6 +50,13 @@ return
 
 
 ;TODO:
+;  Hide state:
+;    HideState = 0, 1, 2
+;    0 - Shown/Hidden   (on activate)
+;    1 - Minimized      (will not automatically show)
+;    2 - Always Hidden  (will not automatically show)
+;
+;
 ;  Bugs:
 ;    * After refresh this.InfoLiteTree.SelectedItem becomes permanently unknown? Not sure why this is occurring...
 ;      Probably has something to do with CTreeViewControl. Temporary fix is force reloading the app with Reload.
@@ -73,7 +94,6 @@ class InfoLiteLab extends CGUI {
       this.LargeIcons := true
       this.DefaultIcon := this.icon
     }
-    
     
     ;When provided a File/Folder hierarchy this function will render it to the TreeView control,
     ;including icons.
@@ -122,7 +142,12 @@ class InfoLiteLab extends CGUI {
     
     ;Bind events:
     this.Refresh.Click.handler := new Delegate(this,"OnRefresh")
-    this.OnMessage(0x0101,"OnGUIKeyUp")
+    
+    WM_KEYUP := 0x0101
+    WM_SYSCOMMAND := 0x112
+    
+    this.OnMessage(WM_KEYUP,"OnGUIKeyUp")
+    this.OnMessage(WM_SYSCOMMAND,"onSysCommand")
     
     ;TreeView Events
     this.InfoLiteTree.DoubleClick.Handler := new Delegate(this,"OnExecuteItem")
@@ -137,8 +162,42 @@ class InfoLiteLab extends CGUI {
     ;Create tree view:
     this.InfoLiteTree.createTree(this.treeItems)
     
+    ;Initialise tray menu
+    this._iniTrayMenu()
+    
+    ;Set hidestate
+    this.DispState := 0
+    
+    ;Set debug mode
+    this.DebugMode := 1
+    
+    
+    this.initialised := true
+    
     ;Show the window
     this.Show("")
+  }
+  
+  DispState {
+    get {
+      return this._.DispState
+    }
+    set {
+      this._.DispState := value
+      ;TOGGLE CHECKBOXES
+      if this.initialised
+        this.Show("")
+      
+    }
+  }
+  DebugMode {
+    get {
+      return this._.DebugMode
+    }
+    set {
+      this._.DebugMode := value - 1
+      this.InfoLite.Debug_Mode := (value - 1)
+    }
   }
   
   ;This returns an array of IIL File/Folder objects. The objects returned will contain the hierarchy to be
@@ -245,11 +304,12 @@ class InfoLiteLab extends CGUI {
     this.SetTree(filter)
   }
   
-  ;;;;SORT OUT WASHING
-  handleChild(shObject){
+  handleChild(shObject,parent:=false){
+    if !parent
+      parent := this
     for i,klass in InfoLiteLab.registeredClasses {
       if klass.identify(shObject) {
-        return klass.create(shObject)
+        return klass.create(shObject,parent)
       }
     }
     return false
@@ -297,6 +357,17 @@ class InfoLiteLab extends CGUI {
       if (this.InfoLiteTree.Focused){
         this.OnExecuteItem(this.InfoLiteTree)
       }
+    }
+  }
+  
+  ;OnSysCommand
+  onSysCommand(wParam,lParam){
+    SC_MINIMIZE := 0xF020
+    
+    if (lParam = SC_MINIMIZE) {
+      ; ILL has been minimised
+      this.DispState := 1
+      this._helperNamedChoiceListCallback("Minimisable",1,"DisplayState",true)
     }
   }
   
@@ -356,7 +427,95 @@ class InfoLiteLab extends CGUI {
       Menu, Context, Show
   }
   
+  ;Create a named menu from keys and values
+  ;
+  _helperNamedChoiceList(MenuName,callback,data,default:=1){
+    ;Ensure helper object is initialised
+    if !this._helperNamedChoiceListData
+      this._helperNamedChoiceListData := {}
+    
+    ;Bind length and callback to data
+    this._helperNamedChoiceListData[MenuName] := {"length":data.length(),"callback":callback, "names":data}
+    
+    ;Get a bound callback function
+    fn := this._helperNamedChoiceListCallback.bind(this)
+    
+    ;Loop through keys (item names) and values (callback function)
+    for i,value in data {
+      ;Add radio buttons to menu
+      Menu, %MenuName%, Add, %value%, %fn%, +Radio
+    }
+    
+    ItemName := data[default]
+    Menu, %MenuName%, Check, %ItemName%
+  }
+  _helperNamedChoiceListCallback(ItemName, ItemPos, MenuName, noCall:=false){
+    ;Uncheck all in menu
+    data := this._helperNamedChoiceListData[MenuName]
+    
+    ;Loop through items and uncheck
+    for i,sItemName in data.names {
+      Menu, %MenuName%, Uncheck, %sItemName%
+    }
+    
+    ;Check chosen item in menu
+    Menu, %MenuName%, Check, %ItemName%
+    
+    ;Call Callback
+    if !noCall
+      data.callback.Call(ItemName,ItemPos,MenuName)
+  }
   
+  
+  
+  ;Initialise tray menu
+  _iniTrayMenu(){
+    ;Open, Help, Window Spy, Reload This Script, Edit This Script, Suspend Hotkeys, Pause Script, Exit
+    Menu, Tray, NoStandard
+    
+    ;Choice list: DisplayState
+    ;0 - Shown/Hidden   (on activate)
+    ;1 - Minimized      (will not automatically show)
+    ;2 - Always Hidden  (will not automatically show)
+    this._helperNamedChoiceList("DisplayState",InfoLiteLab._menuSetDisplayState.bind(this), ["Autohide", "Minimisable", "Always Hidden"])
+    Menu, Tray, Add, Display State, :DisplayState
+    
+    ;Choice List: DebugState
+    ;0 - Debug mode off
+    ;1 - Debug mode 1
+    ;2 - Debug mode 2
+    this._helperNamedChoiceList("DebugState",InfoLiteLab._menuSetDebugMode.bind(this), ["Debug mode off", "Debug mode 1", "Debug mode 2"])
+    Menu, Tray, Add, Debug Mode, :DebugState
+    
+    ;Settings
+    fn := this._menuSettings.bind(this)
+    Menu, Tray, Add, Settings, %fn%
+    
+    
+    ;Reload
+    fn := InfoLiteLab._menuReload.bind(this)
+    Menu, Tray, Add, Reload, %fn%
+    
+    ;Exit
+    fn := InfoLiteLab._menuExit.bind(this)
+    Menu, Tray, Add, Exit, %fn%
+  }
+  
+  _menuSetDebugMode(value,pos){
+    this.DebugMode := pos
+  }
+  _menuSetDisplayState(value,pos){
+    this.DispState := pos - 1
+  }
+  _menuSettings(){
+    msgbox, Currently not implemented
+  }
+  _menuReload(){
+    reload
+  }
+  _menuExit(){
+    ExitApp
+  }
 }
 
 class ILL_Script {
@@ -367,15 +526,17 @@ class ILL_Script {
   }
   
   ;Static method for creating class (allows external libraries with language limitations)
-  create(shObj){
-    return new this(shObj)
+  create(shObj,parent){
+    return new this(shObj,parent)
   }
   
-  __New(shObj){
+  __New(shObj,parent){
     this.type := "Executable"
     this.name := shObj.name
     this.path := shObj.path
     
+    ;Store reference to InfoLiteLab window
+    this.parent := parent
     
     this.isFilterable := true
     
@@ -393,8 +554,7 @@ class ILL_Script {
   ;Execute file
   execute(){
     InfoLite.__DebugTip(A_ThisFunc,"IN_Execute()",true)
-    global DEBUG_VIEWER
-    if DEBUG_VIEWER {
+    if this.parent.DebugMode = 2 {
       msgbox, % this.path
     } else {
       ;Execute ruby script and report on any errors which occurred
@@ -426,11 +586,11 @@ class ILL_Folder {
     return (ComObjType(shObj, "Name") == "IFolder")
   }
   
-  create(shObj){
-    return new this(shObj)
+  create(shObj,parent){
+    return new this(shObj,parent)
   }
   
-  __New(shFolder){
+  __New(shFolder, oILL){
     ;Using type is best avoided but is beneficial to other programs viewing the COM model.
     this.type := "Folder"
     
@@ -442,6 +602,9 @@ class ILL_Folder {
     
     ;Disallow folders to be found by filtering - disallowed because it may look odd
     this.isFilterable := false
+    
+    ;Store reference to InfoLiteLab window
+    this.parent := parent
     
     ;Attempt to find icon for file.
     for i,ext in ILL_Folder.iconExts {
@@ -458,14 +621,14 @@ class ILL_Folder {
     this.children := []
     ;Get folders
     for child in shFolder.SubFolders {
-      if res := InfoLiteLab.handleChild(child) {
+      if res := InfoLiteLab.handleChild(child,parent) {
         this.children.push(res)
       }
     }
     
     ;Get files
     for child in shFolder.files {
-      if res := InfoLiteLab.handleChild(child) {
+      if res := InfoLiteLab.handleChild(child,parent) {
         this.children.push(res)
       }
     }
