@@ -1,4 +1,4 @@
-# InfoLite-Lab
+# InfoLab
 
 The first 3rd party open source InfoWorks ICM and InfoNet tool for dynamic execution of Ruby scripts!
 
@@ -6,7 +6,7 @@ The first 3rd party open source InfoWorks ICM and InfoNet tool for dynamic execu
 
 ## Description
 
-InfoLite Lab adds a tool window to InfoWorks/InfoNet which allows you to execute and run ruby scripts instantly
+InfoLab adds a tool window to InfoWorks/InfoNet which allows you to execute and run ruby scripts instantly
 
 Simply double click on a ruby script to execute it! You can also search in the database of ruby scripts in the search bar for scripts you need.
 
