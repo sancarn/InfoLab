@@ -1,4 +1,5 @@
 ;#Persistent
+;#Persistent
 ;#SingleInstance,Force
 
 
@@ -485,6 +486,8 @@ class InfoLite {
   ;======================================================================================
   
   __DebugTip(f,msg,logToFile:=false){
+    If (this.parent)
+      this.DEBUG_MODE := this.parent.DebugMode
     if (this.DEBUG_MODE) {
       if msg {
         tooltip, %f%::%msg%
