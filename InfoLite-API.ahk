@@ -8,8 +8,17 @@ class InfoLite {
                   ,"ICM-6.5":0x88FC
                   ,"IN-7.5" :0x8A69
                   ,"ICM-7.5":0x8A69 ;Assumption
+                  ,"IN-8.0":0x8A69 ;Assumption
+                  ,"ICM-8.0":0x8A69 ;Assumption
                   ,"IN-8.5" :0x8A69
-                  ,"ICM-8.5":0x8A69}
+                  ,"ICM-8.5":0x8A69
+                  ,"IN-9.0":0x8A69 ;Assumption
+                  ,"ICM-9.0":0x8A69 ;Assumption
+                  ,"IN-9.5":0x8A69 ;Assumption
+                  ,"ICM-9.5":0x8A69 ;Assumption
+                  ,"IN-10.0":0x8A69 ;Assumption
+                  ,"ICM-10.0":0x8A69 ;Assumption
+                  ,"Dummy":0}
   
   static rubyExtScript := InfoLite._getRubyExtScript()
   static Messages := {"WM_COMMAND":     0x0111
