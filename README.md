@@ -2,7 +2,7 @@
 
 The first 3rd party open source InfoWorks ICM and InfoNet tool for dynamic execution of Ruby scripts!
 
-![Test](./PR/pr1.png)]
+![Test](./docs/pr1.png)]
 
 ## Description
 
