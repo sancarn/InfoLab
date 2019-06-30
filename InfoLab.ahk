@@ -9,13 +9,6 @@ Gui, InfoLab1:-dpiscale
 
 
 ;TODO:
-;  Hide state:
-;    HideState = 0, 1, 2
-;    0 - Shown/Hidden   (on activate)
-;    1 - Minimized      (will not automatically show)
-;    2 - Always Hidden  (will not automatically show)
-;
-;
 ;  Bugs:
 ;    * After refresh this.InfoLiteTree.SelectedItem becomes permanently unknown? Not sure why this is occurring...
 ;      Probably has something to do with CTreeViewControl. Temporary fix is force reloading the app with Reload.
