@@ -7,12 +7,32 @@ Gui, InfoLab1:-dpiscale
 
 ;RegisterObjActive(window  ,"{CCCCCCCC-CCCC-CCCC-CCCC-ACCCCCCCCCC1}")
 
-;ToDo:
-;  * Bind API to Window object
-;  * Bind Window object to API (as parent)
-;  * API should use parent.DebugMode for things like DebugTip instead of global DEBUG_MODE
-;  * Fix refresh bug
 
+;TODO:
+;  Hide state:
+;    HideState = 0, 1, 2
+;    0 - Shown/Hidden   (on activate)
+;    1 - Minimized      (will not automatically show)
+;    2 - Always Hidden  (will not automatically show)
+;
+;
+;  Bugs:
+;    * After refresh this.InfoLiteTree.SelectedItem becomes permanently unknown? Not sure why this is occurring...
+;      Probably has something to do with CTreeViewControl. Temporary fix is force reloading the app with Reload.
+;      #REFRESH to find related code
+;  Settings!
+;    * Can be stored in any root
+;    * Stores the location of other roots   
+;        roots=["%A_AppDir%","%A_Documents%\InfoLab","%A_Appdata%\InfoLab"]
+;    * Stored as JSON file?
+;    * Also allow for other generic sections e.g. Keyboard Shortcuts!
+;  Libs:
+;    * Maybe ignore folders named "Lib" ?
+;  Plugins:
+;    * .sql files - Execute SQL from window.
+;    * .tb files  - Toolbar execution.
+;  General:
+;    * Officially register COM Server via CLSID and test using VBScript
 
 ;Hide when ICM not active, show when active.
 SetTimer, OnTimer
@@ -52,30 +72,6 @@ OnTimer:
     }
   }
 return
-
-
-;TODO:
-;  Hide state:
-;    HideState = 0, 1, 2
-;    0 - Shown/Hidden   (on activate)
-;    1 - Minimized      (will not automatically show)
-;    2 - Always Hidden  (will not automatically show)
-;
-;
-;  Bugs:
-;    * After refresh this.InfoLiteTree.SelectedItem becomes permanently unknown? Not sure why this is occurring...
-;      Probably has something to do with CTreeViewControl. Temporary fix is force reloading the app with Reload.
-;      #REFRESH to find related code
-;  Settings!
-;    * Can be stored in any root
-;    * Stores the location of other roots   
-;        roots=["%A_AppDir%","%A_Documents%\InfoLab","%A_Appdata%\InfoLab"]
-;    * Stored as JSON file?
-;    * Also allow for other generic sections e.g. Keyboard Shortcuts!
-;  Libs:
-;    * Maybe ignore folders named "Lib" ?
-
-
 
 class InfoLab extends CGUI {
   ;Set default registered classes
