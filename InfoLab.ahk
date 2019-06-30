@@ -4,6 +4,7 @@ global window := new InfoLab()
 global window_shown := true
 Gui, InfoLab1:+AlwaysOnTop
 Gui, InfoLab1:-dpiscale
+window.size(0) ;required because of change in dpiscale option
 
 ;RegisterObjActive(window  ,"{CCCCCCCC-CCCC-CCCC-CCCC-ACCCCCCCCCC1}")
 
